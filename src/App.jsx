@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Bounds, Html, Line, OrbitControls, useGLTF } from '@react-three/drei'
+import { Html, Line, OrbitControls, useGLTF } from '@react-three/drei'
 import { AdditiveBlending, CanvasTexture, BufferGeometry, Float32BufferAttribute, SRGBColorSpace, MeshBasicMaterial, Box3, EdgesGeometry, MOUSE, TOUCH, Vector3 } from 'three'
 
 const ROOM_URL = import.meta.env.BASE_URL + 'room-blender.glb'
@@ -158,7 +158,9 @@ const styles = `
     border: 2px solid #9bb3d9; box-shadow: 4px 4px 0 #070c18;
     font: 700 1rem/1.3 var(--pixel-font);
   }
-  .retro-stage { position: absolute; inset: 0; }
+  .retro-stage { position: absolute; inset: 0; touch-action: none; }
+  .room-ui { position: absolute; z-index: 30; pointer-events: none; }
+  .room-ui .retro-stage, .room-ui button, .room-ui a, .room-ui .retro-panel { pointer-events: auto; }
   .retro-stage canvas { image-rendering: pixelated; }
   .portfolio-room[data-projects="true"] canvas { image-rendering: auto; }
   .retro-menu {
@@ -604,15 +606,16 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
   const screenMaterials = useRef([])
   const camera = useThree((state) => state.camera)
   const controls = useThree((state) => state.controls)
-  const overview = useRef(null)
   const flight = useRef(null)
-  const settledFrames = useRef(0)
+  const viewportSize = useThree((state) => state.size)
+  const roomBounds = useMemo(() => new Box3().setFromObject(scene), [scene])
 
-  useFrame(() => {
-    if (controls && !overview.current && ++settledFrames.current === 10) {
-      overview.current = { position: camera.position.clone(), target: controls.target.clone(), zoom: camera.zoom }
-    }
-  })
+  useEffect(() => {
+    // Trackpad pinch should zoom the scene, not pan/zoom the entire page.
+    const preventPageZoom = (event) => { if (event.ctrlKey) event.preventDefault() }
+    canvas.addEventListener('wheel', preventPageZoom, { passive: false })
+    return () => canvas.removeEventListener('wheel', preventPageZoom)
+  }, [canvas])
 
   const { targets, targetsByObject } = useMemo(() => {
     scene.updateMatrixWorld(true)
@@ -687,16 +690,27 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     if (!controls) return
 
     const destination = targets.find(({ entry }) => entry === activeEntry)
-    if (!destination && !overview.current) return
-
+    controls.enableDamping = false
+    controls.update() // Clear residual orbit momentum before driving the camera.
     const start = {
       position: camera.position.clone(),
       target: controls.target.clone(),
       zoom: camera.zoom,
     }
 
-    if (destination && !overview.current) overview.current = start
-    const home = overview.current
+    const target = roomBounds.getCenter(new Vector3())
+    const size = roomBounds.getSize(new Vector3())
+    const direction = new Vector3(-40, 32, 48).normalize()
+    const right = new Vector3().crossVectors(camera.up, direction).normalize()
+    const up = new Vector3().crossVectors(direction, right).normalize()
+    const width = Math.abs(right.x) * size.x + Math.abs(right.y) * size.y + Math.abs(right.z) * size.z
+    const height = Math.abs(up.x) * size.x + Math.abs(up.y) * size.y + Math.abs(up.z) * size.z
+    const home = {
+      target,
+      position: target.clone().addScaledVector(direction, Math.max(size.length() * 2, 80)),
+      zoom: Math.min(viewportSize.width / (width * 1.2), viewportSize.height / (height * 1.2)),
+    }
+    controls.minZoom = Math.min(8, home.zoom * 0.5)
     let end = home
 
     if (destination) {
@@ -733,8 +747,9 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     return () => {
       flight.current = null
       controls.enabled = true
+      controls.enableDamping = !reducedMotion
     }
-  }, [activeEntry, camera, canvas, controls, targets, resetKey])
+  }, [activeEntry, camera, canvas, controls, targets, resetKey, roomBounds, viewportSize.width, viewportSize.height, reducedMotion])
 
   useFrame((_, delta) => {
     const move = flight.current
@@ -752,6 +767,7 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     if (progress === 1) {
       flight.current = null
       controls.enabled = true
+      controls.enableDamping = !reducedMotion
     }
   })
 
@@ -883,6 +899,24 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
   )
 }
 
+function ViewportUI({ children }) {
+  const [style, setStyle] = useState({ inset: 0 })
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    const update = () => setStyle({
+      left: viewport.offsetLeft, top: viewport.offsetTop,
+      width: viewport.width * viewport.scale, height: viewport.height * viewport.scale,
+      transform: `scale(${1 / viewport.scale})`, transformOrigin: 'top left',
+    })
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => { viewport.removeEventListener('resize', update); viewport.removeEventListener('scroll', update) }
+  }, [])
+  return <div className="room-ui" style={style}>{children}</div>
+}
+
 export default function App() {
   const [musicPlaying, setMusicPlaying] = useState(false)
   const music = useRef(null)
@@ -990,6 +1024,7 @@ export default function App() {
 
   return (
     <main className="portfolio-room" data-night={night} data-projects={viewingProjects}>
+      <ViewportUI>
       <style>{styles}</style>
       <div className="room-clouds" aria-hidden="true" />
 
@@ -1022,7 +1057,7 @@ export default function App() {
           />
 
           <Suspense fallback={null}>
-            <Bounds fit margin={1.15} maxDuration={0.01}>
+
               <Room
                 onSelect={(entry) => { setActiveEntry(entry); setResetKey((value) => value + 1) }}
                 onTargets={setAvailableNames}
@@ -1035,7 +1070,7 @@ export default function App() {
                 activeEntry={activeEntry}
                 reducedMotion={reducedMotion}
               />
-            </Bounds>
+
           </Suspense>
         </Canvas>
       </div>
@@ -1095,6 +1130,7 @@ export default function App() {
           </div> : activeEntry.content}
         </section>
       )}
+      </ViewportUI>
     </main>
   )
 }
