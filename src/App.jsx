@@ -428,6 +428,45 @@ function MusicParticles({ scene, playing, reducedMotion }) {
   </group>
 }
 
+function ContactPhone() {
+  const [hovered, setHovered] = useState(false)
+  const canvas = useThree((state) => state.gl.domElement)
+  const texture = useMemo(() => {
+    const surface = document.createElement('canvas')
+    surface.width = 384; surface.height = 640
+    const ctx = surface.getContext('2d')
+    ctx.fillStyle = '#18263e'; ctx.fillRect(0, 0, 384, 640)
+    ctx.fillStyle = '#a7edda'; ctx.font = 'bold 43px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText('Contact', 192, 325); ctx.fillText('me!', 192, 380)
+    ctx.strokeStyle = '#a7edda'; ctx.lineWidth = 7
+    ctx.strokeRect(112, 160, 160, 100)
+    ctx.beginPath(); ctx.moveTo(112, 160); ctx.lineTo(192, 220); ctx.lineTo(272, 160); ctx.stroke()
+    ctx.fillStyle = '#e9f1ff'; ctx.font = '24px sans-serif'; ctx.fillText('Let’s connect', 192, 460)
+    const map = new CanvasTexture(surface); map.colorSpace = SRGBColorSpace
+    return map
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+  useEffect(() => {
+    if (!hovered) return
+    const previous = canvas.style.cursor; canvas.style.cursor = 'pointer'
+    return () => { canvas.style.cursor = previous }
+  }, [hovered, canvas])
+  return <group position={[12.8, 6.94, 13.65]} rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
+    onPointerMove={(event) => { event.stopPropagation(); setHovered(true) }}
+    onPointerOut={() => setHovered(false)}
+    onClick={(event) => { event.stopPropagation(); if (event.delta < 5) window.location.href = 'mailto:judenttruong@gmail.com' }}>
+    <mesh><boxGeometry args={[1.65, 2.9, 0.22]} /><meshStandardMaterial color="#121722" /></mesh>
+    <mesh position={[0, 0, 0.12]}>
+      <planeGeometry args={[1.4, 2.5]} /><meshBasicMaterial map={texture} toneMapped={false} />
+    </mesh>
+    <Line points={[[-0.825,-1.45,0.13],[0.825,-1.45,0.13],[0.825,1.45,0.13],[-0.825,1.45,0.13],[-0.825,-1.45,0.13]]}
+      color="white" lineWidth={hovered ? 5 : 2} raycast={ignoreRaycast} toneMapped={false} />
+    {hovered && <Html center position={[0, 2.4, 0]} style={{ pointerEvents: 'none' }}>
+      <div className="desk-link-tooltip">Contact me!</div>
+    </Html>}
+  </group>
+}
+
 function DeskLinks({ activeEntry, onSelect, canOpen }) {
   const [hovered, setHovered] = useState(null)
   const canvas = useThree((state) => state.gl.domElement)
@@ -825,6 +864,7 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
       </mesh>}
       {switchTarget && <Outline points={switchTarget.points} active={hovered === 'switch'}
         phase={0} reducedMotion={reducedMotion} />}
+      <ContactPhone />
       <DeskLinks activeEntry={activeEntry} onSelect={onSelect} canOpen={() => !flight.current} />
       <ProjectScreen scene={scene} project={project} />
       <LampLighting scene={scene} night={night} />
