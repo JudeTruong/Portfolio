@@ -1030,6 +1030,7 @@ export default function App() {
 
       <div className="retro-stage">
         <Canvas
+          resize={{ offsetSize: true }}
           orthographic
           dpr={viewingProjects ? [1, 2] : PIXEL_RATIO}
           camera={{ position: [-40, 32, 48], near: 0.01, far: 500 }}
