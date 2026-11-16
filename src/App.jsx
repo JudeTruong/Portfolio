@@ -253,11 +253,46 @@ const styles = `
   .retro-panel h3 { font: 700 1.2rem/1.2 var(--pixel-font); }
   .retro-panel a { color: var(--accent); text-underline-offset: 3px; }
   @media (max-width: 760px) {
-    .retro-menu { right: 16px; flex-direction: row; flex-wrap: wrap; }
-    .retro-panel { top: auto; right: 16px; bottom: 16px; max-height: 36%; }
-    .retro-arrow { width: 44px; height: 50px; }
-    .room-controls { bottom: auto; top: 135px; }
+    .retro-menu {
+      top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left));
+      right: max(8px, env(safe-area-inset-right)); flex-direction: row; flex-wrap: nowrap;
+      overflow-x: auto; padding: 0 4px 8px 0; pointer-events: auto; scrollbar-width: thin;
+      overscroll-behavior-x: contain; touch-action: pan-x;
+    }
+    .retro-menu .retro-button { flex: 0 0 auto; white-space: nowrap; }
+    .retro-button { min-height: 44px; font-size: 0.85rem; padding: 10px; }
+    .retro-stage { top: calc(112px + env(safe-area-inset-top)); bottom: env(safe-area-inset-bottom); }
+    .portfolio-room[data-focused="true"] .retro-stage { bottom: 40%; }
+    .retro-panel {
+      top: auto; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right));
+      bottom: max(8px, env(safe-area-inset-bottom)); width: auto;
+      height: calc(40% - max(16px, env(safe-area-inset-bottom))); max-height: none;
+      padding: 12px; font-size: 14px; overscroll-behavior: contain; touch-action: pan-y;
+      overflow-wrap: anywhere;
+    }
+    .retro-panel header { position: sticky; top: -12px; background: #111a31; padding-top: 8px; }
+    .retro-panel h2 { font-size: 1.2rem; }
+    .retro-panel header .retro-button { flex-shrink: 0; }
+    .retro-arrow { width: 44px; height: 48px; top: calc(30% + 56px); }
+    .retro-prev { left: max(8px, env(safe-area-inset-left)); }
+    .retro-next { right: max(8px, env(safe-area-inset-right)); }
+    .room-controls { bottom: auto; top: calc(64px + env(safe-area-inset-top)); left: 8px; right: 8px; }
     .room-controls span { display: none; }
+    .room-controls span[role="alert"] { display: block; }
+    .desk-link-tooltip { font-size: 12px; padding: 8px; }
+  }
+  @media (max-width: 950px) and (max-height: 500px) and (orientation: landscape) {
+    .retro-menu { top: 8px; left: 8px; right: 8px; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; pointer-events: auto; padding-bottom: 8px; }
+    .retro-menu .retro-button { flex: 0 0 auto; white-space: nowrap; }
+    .retro-button { min-height: 44px; font-size: 0.85rem; }
+    .retro-stage { top: 64px; bottom: 56px; }
+    .portfolio-room[data-focused="true"] .retro-stage { right: 42%; bottom: 8px; }
+    .retro-panel { top: 64px; bottom: 8px; right: 8px; left: auto; width: 40%; height: auto; max-height: none; padding: 12px; font-size: 13px; overscroll-behavior: contain; touch-action: pan-y; }
+    .retro-panel h2 { font-size: 1.1rem; }
+    .room-controls { top: auto; bottom: 8px; }
+    .room-controls span { display: none; }
+    .retro-arrow { top: 50%; width: 44px; height: 48px; }
+    .retro-next { right: calc(42% + 8px); }
   }
   @media (prefers-reduced-motion: reduce) {
     .room-clouds::before, .room-clouds::after, .retro-panel { animation: none; }
@@ -730,13 +765,13 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
       const spanX = camera.right - camera.left
       const spanY = camera.top - camera.bottom
       const desktop = canvas.clientWidth > 760
-      const zoom = Math.max(8, Math.min(250,
+      const zoom = Math.max(0.1, Math.min(250,
         spanX * (desktop ? 0.42 : 0.7) / Math.max(width, 0.001),
-        spanY * (desktop ? preset.fill : 0.38) / Math.max(height, 0.001),
+        spanY * (desktop ? preset.fill : 0.78) / Math.max(height, 0.001),
       ))
-      // Leave space for the information panel on desktop and below on mobile.
+      // Desktop overlays its panel; mobile reserves a separate canvas area.
       if (desktop) target.addScaledVector(right, spanX * (preset.offsetX ?? 0.16) / zoom)
-      else target.addScaledVector(up, -spanY * 0.12 / zoom)
+
       const distance = Math.max(home.position.distanceTo(home.target), size.length() * 2, 1)
       end = {
         target,
@@ -1063,7 +1098,7 @@ export default function App() {
   }, [])
 
   return (
-    <main className="portfolio-room" data-night={night} data-projects={viewingProjects}>
+    <main className="portfolio-room" data-night={night} data-projects={viewingProjects} data-focused={Boolean(activeEntry)}>
       <ViewportUI>
       <style>{styles}</style>
       <div className="room-clouds" aria-hidden="true" />
