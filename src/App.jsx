@@ -94,8 +94,8 @@ const categories = [
   { label: 'Projects', objects: ['Monitor'] },
   { label: 'Experience', objects: ['YorkRegion', 'SMB', 'Port.001'] },
   { label: 'Extracurriculars', objects: ['VSA.001', 'AWS', 'Poker'] },
-  { label: 'About', objects: ['Book', 'Cap'] },
-  { label: 'Interests', objects: ['Poster', 'BoomBox', 'Chessboard'] },
+  { label: 'Education', objects: ['Cap'] },
+  { label: 'Interests', objects: ['Book', 'Poster', 'BoomBox', 'Chessboard'] },
 ]
 
 
@@ -158,6 +158,10 @@ const styles = `
     border: 2px solid #9bb3d9; box-shadow: 4px 4px 0 #070c18;
     font: 700 1rem/1.3 var(--pixel-font);
   }
+  .room-loading { position: absolute; inset: 0; z-index: 25; display: grid; place-content: center; justify-items: center; gap: 10px; color: #17243d; font: 13px monospace; pointer-events: none; }
+  .loading-ring { width: 24px; height: 24px; border: 2px solid #17243d25; border-top-color: #17243d; border-radius: 50%; animation: loading-spin 0.9s linear infinite; }
+  @keyframes loading-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .loading-ring { animation: none; border-style: dotted; } }
   .retro-stage { position: absolute; inset: 0; touch-action: none; }
   .room-ui { position: absolute; z-index: 30; pointer-events: none; }
   .room-ui .retro-stage, .room-ui button, .room-ui a, .room-ui .retro-panel { pointer-events: auto; }
@@ -973,6 +977,42 @@ export default function App() {
   useEffect(() => () => { void audioContext.current?.close().catch(() => {}) }, [])
   const [activeEntry, setActiveEntry] = useState(null)
   const [resetKey, setResetKey] = useState(0)
+  function selectEntry(entry) {
+    setActiveEntry(entry)
+    setResetKey((value) => value + 1)
+    const computer = entry?.objectName === 'Monitor'
+    const experience = ['YorkRegion', 'SMB', 'Port.001'].includes(entry?.objectName)
+    if (!computer && !experience) return
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+      const context = audioContext.current ??= new AudioContext()
+      void context.resume().catch(() => {})
+      const gain = context.createGain()
+      const now = context.currentTime
+      let source
+      if (computer) {
+        const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * 0.035), context.sampleRate)
+        const samples = buffer.getChannelData(0)
+        for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * Math.exp(-i / (context.sampleRate * 0.004))
+        source = context.createBufferSource()
+        source.buffer = buffer
+        gain.gain.value = 0.07
+      } else {
+        source = context.createOscillator()
+        source.type = 'sine'
+        source.frequency.value = 880
+        gain.gain.setValueAtTime(0, now)
+        gain.gain.linearRampToValueAtTime(0.012, now + 0.008)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24)
+        source.stop(now + 0.25)
+      }
+      source.connect(gain).connect(context.destination)
+      source.onended = () => { source.disconnect(); gain.disconnect() }
+      source.start()
+    } catch { /* Navigation remains usable when audio is unavailable. */ }
+  }
+
   function resetRoom() {
     setActiveEntry(null)
     setResetKey((value) => value + 1)
@@ -999,7 +1039,7 @@ export default function App() {
     }
     if (currentEntries.length < 2) return
     const index = (activeIndex + direction + currentEntries.length) % currentEntries.length
-    setActiveEntry(currentEntries[index])
+    selectEntry(currentEntries[index])
   }
   const [reducedMotion, setReducedMotion] = useState(false)
 
@@ -1028,6 +1068,12 @@ export default function App() {
       <style>{styles}</style>
       <div className="room-clouds" aria-hidden="true" />
 
+      {availableNames.length === 0 && (
+        <div className="room-loading" role="status" aria-live="polite">
+          <span className="loading-ring" aria-hidden="true" />
+          <span>Loading room</span>
+        </div>
+      )}
       <div className="retro-stage">
         <Canvas
           resize={{ offsetSize: true }}
@@ -1060,7 +1106,7 @@ export default function App() {
           <Suspense fallback={null}>
 
               <Room
-                onSelect={(entry) => { setActiveEntry(entry); setResetKey((value) => value + 1) }}
+                onSelect={selectEntry}
                 onTargets={setAvailableNames}
                 musicPlaying={musicPlaying}
                 onToggleMusic={toggleMusic}
@@ -1093,7 +1139,7 @@ export default function App() {
               className="retro-button"
               type="button"
               aria-pressed={activeCategory === category}
-              onClick={() => { setActiveEntry(first ?? fallback); setResetKey((value) => value + 1) }}
+              onClick={() => selectEntry(first ?? fallback)}
             >
               {category.label}
             </button>
