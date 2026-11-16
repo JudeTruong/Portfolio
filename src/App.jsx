@@ -349,11 +349,11 @@ function ProjectScreen({ scene, project }) {
     result.computeVertexNormals()
     return result
   }, [scene])
-  const [texture, setTexture] = useState(null)
+  const [loadedImage, setLoadedImage] = useState(null)
+  const texture = loadedImage?.project === project ? loadedImage.texture : null
   useEffect(() => {
     let cancelled = false
     let map
-    setTexture(null)
     const image = new Image()
     image.onload = () => {
       if (cancelled) return
@@ -371,7 +371,7 @@ function ProjectScreen({ scene, project }) {
       map = new CanvasTexture(canvas)
       map.colorSpace = SRGBColorSpace
       map.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy())
-      setTexture(map)
+      setLoadedImage({ project, texture: map })
     }
     image.src = import.meta.env.BASE_URL + 'projects/' + project.image
     return () => { cancelled = true; map?.dispose() }
@@ -471,7 +471,7 @@ function MusicParticles({ scene, playing, reducedMotion }) {
 
 function ContactPhone() {
   const [hovered, setHovered] = useState(false)
-  const canvas = useThree((state) => state.gl.domElement)
+  const getThree = useThree((state) => state.get)
   const texture = useMemo(() => {
     const surface = document.createElement('canvas')
     surface.width = 384; surface.height = 640
@@ -489,9 +489,10 @@ function ContactPhone() {
   useEffect(() => () => texture.dispose(), [texture])
   useEffect(() => {
     if (!hovered) return
+    const canvas = getThree().gl.domElement
     const previous = canvas.style.cursor; canvas.style.cursor = 'pointer'
     return () => { canvas.style.cursor = previous }
-  }, [hovered, canvas])
+  }, [hovered, getThree])
   return <group position={[12.8, 6.94, 13.65]} rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
     onPointerMove={(event) => { event.stopPropagation(); setHovered(true) }}
     onPointerOut={() => setHovered(false)}
@@ -510,7 +511,7 @@ function ContactPhone() {
 
 function DeskLinks({ activeEntry, onSelect, canOpen }) {
   const [hovered, setHovered] = useState(null)
-  const canvas = useThree((state) => state.gl.domElement)
+  const getThree = useThree((state) => state.get)
   const textures = useMemo(() => {
     function create(kind) {
       const canvas = document.createElement('canvas')
@@ -542,9 +543,10 @@ function DeskLinks({ activeEntry, onSelect, canOpen }) {
   useEffect(() => () => Object.values(textures).forEach((texture) => texture.dispose()), [textures])
   useEffect(() => {
     if (!hovered) return
+    const canvas = getThree().gl.domElement
     const previous = canvas.style.cursor; canvas.style.cursor = 'pointer'
     return () => { canvas.style.cursor = previous }
-  }, [hovered, canvas])
+  }, [hovered, getThree])
   const links = [
     { id: 'resume', position: [14.5, 6.84, -1.25], rotation: [-Math.PI / 2, 0, -Math.PI / 2], size: [3, 4], url: import.meta.env.BASE_URL + 'JudeTruongResume.pdf' },
     { id: 'linkedin', position: [16.8, 8.15, 13.7], rotation: [0, -Math.PI / 2, 0], size: [2.6, 1.65], url: 'https://www.linkedin.com/in/jude-truong-4a7b182a1/' },
@@ -598,6 +600,7 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     size: new Vector3(7, 4, 7),
   }), [])
   const mouseMotion = useRef(null)
+  const roomObject = useRef(null)
   const deskMouse = useMemo(() => {
     const object = scene.getObjectByName('mouse')
     return object ? { object, origin: object.position.clone() } : null
@@ -609,15 +612,16 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     return false
   }
   useFrame((_, delta) => {
-    if (!deskMouse || mouseMotion.current === null) return
+    const mouse = roomObject.current?.getObjectByName('mouse')
+    if (!mouse || !deskMouse || mouseMotion.current === null) return
     mouseMotion.current += delta
     const duration = reducedMotion ? 0.35 : 1.4
     const progress = Math.min(mouseMotion.current / duration, 1)
     // The desktop's left/right direction is the room's Z axis.
     const distance = reducedMotion ? 0.25 : 1.2
-    deskMouse.object.position.z = deskMouse.origin.z - Math.sin(progress * Math.PI * 2) * distance
+    mouse.position.z = deskMouse.origin.z - Math.sin(progress * Math.PI * 2) * distance
     if (progress === 1) {
-      deskMouse.object.position.copy(deskMouse.origin)
+      mouse.position.copy(deskMouse.origin)
       mouseMotion.current = null
     }
   })
@@ -640,6 +644,7 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     position.x -= 0.3
     return { position, points, size: [Math.max(size.x, 1), Math.max(size.y, 2.5), Math.max(size.z, 2)] }
   }, [scene])
+  const getThree = useThree((state) => state.get)
   const canvas = useThree((state) => state.gl.domElement)
   const [hovered, setHovered] = useState(null)
   const screenMaterials = useRef([])
@@ -726,6 +731,8 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
   }, [onTargets, targets])
 
   useEffect(() => {
+    const { camera, controls, gl } = getThree()
+    const canvas = gl.domElement
     if (!controls) return
 
     const destination = targets.find(({ entry }) => entry === activeEntry)
@@ -788,9 +795,9 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
       controls.enabled = true
       controls.enableDamping = !reducedMotion
     }
-  }, [activeEntry, camera, canvas, controls, targets, resetKey, roomBounds, viewportSize.width, viewportSize.height, reducedMotion])
+  }, [activeEntry, getThree, camera, controls, targets, resetKey, roomBounds, viewportSize.width, viewportSize.height, reducedMotion])
 
-  useFrame((_, delta) => {
+  useFrame(({ camera, controls }, delta) => {
     const move = flight.current
     if (!move || !controls) return
 
@@ -827,10 +834,11 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
 
   useEffect(() => {
     if (!hovered) return
+    const canvas = getThree().gl.domElement
     const previous = canvas.style.cursor
     canvas.style.cursor = 'pointer'
     return () => { canvas.style.cursor = previous }
-  }, [canvas, hovered])
+  }, [getThree, hovered])
 
   useEffect(() => {
     const screen = scene.getObjectByName('MonitorScreen')
@@ -867,13 +875,14 @@ function Room({ onSelect, onTargets, activeEntry, reducedMotion, resetKey, night
     const goal = hovered === 'Monitor' || activeEntry?.objectName === 'Monitor' ? 0.75 : 0.08
     const blend = reducedMotion ? 1 : 1 - Math.exp(-10 * delta)
     for (const material of screenMaterials.current) {
-      material.emissiveIntensity += (goal - material.emissiveIntensity) * blend
+      material.setValues({ emissiveIntensity: material.emissiveIntensity + (goal - material.emissiveIntensity) * blend })
     }
   })
 
   return (
     <>
       <primitive
+        ref={roomObject}
         object={scene}
         onPointerMove={(event) => {
           event.stopPropagation()
