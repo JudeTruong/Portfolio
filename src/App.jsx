@@ -33,9 +33,13 @@ const projects = [
   { title: 'BlueCall', image: 'bluecall.png', description: "BlueCall is an AI-powered compliance workflow that uses automated calling, SMS upload links, dashboard filters, and admin review workflows to reduce manual spreadsheet tracking for WSIB subcontractors." },
 ]
 
+function GitHubProfileLink() {
+  return <p className="github-profile-link"><a href="https://github.com/JudeTruong" target="_blank" rel="noopener noreferrer">Explore my GitHub profile ↗</a></p>
+}
+
 const entries = [
   { objectName: 'resume', label: 'Resume', content: <p>Here’s my resume! Click the paper again to open the PDF.</p> },
-  { objectName: 'linkedin', label: 'LinkedIn', content: <p>Check out my LinkedIn! Click the badge again to open my profile.</p> },
+  { objectName: 'linkedin', label: 'LinkedIn', content: <><p>Check out my LinkedIn! Click the badge again to open my profile.</p><GitHubProfileLink /></> },
   {
     objectName: 'Chessboard', fallbackNames: ['ChessBoard', 'chessboard', 'Chess', 'chess'], label: 'Chess',
     content: <>
@@ -251,6 +255,8 @@ const styles = `
   }
   .chess-description { min-height: 3.2em; margin: 16px 0; }
   .retro-panel h3 { font: 700 1.2rem/1.2 var(--pixel-font); }
+  .github-profile-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid #526b93; }
+  .github-profile-link a { display: inline-flex; align-items: center; min-height: 44px; }
   .retro-panel a { color: var(--accent); text-underline-offset: 3px; }
   @media (max-width: 760px) {
     .retro-menu {
@@ -1218,6 +1224,7 @@ export default function App() {
             <h3>{projects[projectIndex].title}</h3>
             {projects[projectIndex].description && <p>{projects[projectIndex].description}</p>}
             {projects[projectIndex].link && <a href={projects[projectIndex].link} target="_blank" rel="noreferrer">View project on GitHub</a>}
+            <GitHubProfileLink />
           </div> : activeEntry.content}
         </section>
       )}
