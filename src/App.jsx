@@ -39,7 +39,7 @@ function GitHubProfileLink() {
 
 const entries = [
   { objectName: 'resume', label: 'Resume', content: <p>Here’s my resume! Click the paper again to open the PDF.</p> },
-  { objectName: 'linkedin', label: 'LinkedIn', content: <><p>Check out my LinkedIn! Click the badge again to open my profile.</p><GitHubProfileLink /></> },
+  { objectName: 'linkedin', label: 'LinkedIn', content: <p>Check out my LinkedIn! Click the badge again to open my profile.</p> },
   {
     objectName: 'Chessboard', fallbackNames: ['ChessBoard', 'chessboard', 'Chess', 'chess'], label: 'Chess',
     content: <>
