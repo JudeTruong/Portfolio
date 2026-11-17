@@ -100,6 +100,7 @@ const categories = [
   { label: 'Extracurriculars', objects: ['VSA.001', 'AWS', 'Poker'] },
   { label: 'Education', objects: ['Cap'] },
   { label: 'Interests', objects: ['Book', 'Poster', 'BoomBox', 'Chessboard'] },
+  { label: 'LinkedIn', objects: ['linkedin'] },
 ]
 
 
